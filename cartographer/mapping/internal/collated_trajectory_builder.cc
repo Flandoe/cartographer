@@ -19,6 +19,49 @@
 #include "cartographer/common/time.h"
 #include "glog/logging.h"
 
+#include <ctime>
+#include <chrono>
+#include <stdio.h>
+const std::string RED("\033[0;31m");
+const std::string GREEN("\033[1;32m");
+const std::string YELLOW("\033[1;33m");
+const std::string CYAN("\033[0;36m");
+const std::string MAGENTA("\033[0;35m");
+const std::string RESET("\033[0m");
+class Timer
+{
+public:
+    Timer(const char *nameIn)
+    {
+        name = nameIn;
+        tic();
+    }
+
+    void tic()
+    {
+        start = std::chrono::system_clock::now();
+    }
+
+    double toc()
+    {
+        end = std::chrono::system_clock::now();
+        std::chrono::duration<double> dt = end - start;
+        return dt.count() * 1000;
+    }
+
+    void tic_toc()
+    {
+        printf("The process %s takes %f ms.\n", name, toc());
+    }
+
+private:
+    const char* name;
+    std::chrono::time_point<std::chrono::system_clock> start, end;
+};
+
+int odom_pub_cnt = 0;
+double runtime = 0;
+
 namespace cartographer {
 namespace mapping {
 
@@ -64,6 +107,7 @@ void CollatedTrajectoryBuilder::AddData(std::unique_ptr<sensor::Data> data) {
 
 void CollatedTrajectoryBuilder::HandleCollatedSensorData(
     const std::string& sensor_id, std::unique_ptr<sensor::Data> data) {
+      Timer t_odm("LidarOdometry");
   auto it = rate_timers_.find(sensor_id);
   if (it == rate_timers_.end()) {
     it = rate_timers_
@@ -84,6 +128,11 @@ void CollatedTrajectoryBuilder::HandleCollatedSensorData(
   }
 
   data->AddToTrajectoryBuilder(wrapped_trajectory_builder_.get());
+  std::cout<<RED<<"odom_pub_cnt: "<<++odom_pub_cnt<<RESET<<std::endl;
+  t_odm.tic_toc();
+  runtime += t_odm.toc();
+  std::cout<<RED<<"Odometry ALL run time (ms): "<<runtime<<RESET<<std::endl;//注意这个计数里包含了所有传感器的计数，所以不适合直接除以odom_pub_cnt
+  // std::cout<<RED<<"Odometry average run time (ms): "<<runtime / odom_pub_cnt<<RESET<<std::endl;
 }
 
 }  // namespace mapping
